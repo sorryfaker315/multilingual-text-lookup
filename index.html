@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>多语种文言查库 · 网页版 2.4</title>
+<title>多语种文言查库 · 网页版 2.5</title>
 <style>:root {
   color-scheme: light;
   font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
@@ -356,6 +356,24 @@ main.is-home {
 }
 #import-status:empty { display: none; }
 [hidden] { display: none !important; }
+.local-tools { margin-bottom: 14px; }
+.local-tools select { max-width: 100%; }
+.local-history {
+  max-height: 300px;
+  overflow: auto;
+  margin-top: 8px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.local-history summary { cursor: pointer; color: var(--green); font-weight: 650; }
+.local-history label { display: block; margin: 8px 0; }
+.local-history input { width: min(100%, 230px); font: inherit; padding: 4px 6px; }
+.local-history ul { padding-left: 20px; margin-bottom: 0; }
+.local-history li { margin-block: 8px; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -365,7 +383,7 @@ main.is-home {
       <header class="page-header">
         <div>
           <h1>多语种文言查库</h1>
-          <p class="muted"><span>网页版 2.4</span> · <span id="index-status" role="status">尚未导入词库</span></p>
+          <p class="muted"><span>网页版 2.5</span> · <span id="index-status" role="status">尚未导入词库</span></p>
         </div>
         <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true"
           aria-controls="usage-guide" hidden>使用说明</button>
@@ -373,8 +391,19 @@ main.is-home {
       <div class="import-panel">
         <input id="catalog-file" type="file" accept=".xlsx" hidden>
         <button id="choose-catalog" type="button">导入本机词库</button>
-        <span class="muted">支持 .xlsx，文件仅在浏览器内读取。</span>
+        <span class="muted">支持 .xlsx，词库仅保存在当前浏览器。</span>
         <p id="import-status" class="muted" role="status"></p>
+      </div>
+      <div id="local-tools" class="local-tools" hidden>
+        <label for="catalog-version">本机词库</label>
+        <select id="catalog-version"></select>
+        <details id="local-history" class="local-history">
+          <summary>本机修改记录</summary>
+          <label>记录署名 <input id="editor-name" placeholder="本机用户" maxlength="60"></label>
+          <p id="history-status" class="muted" role="status"></p>
+          <ul id="history-list"></ul>
+          <button id="history-more" type="button" hidden>显示更早记录</button>
+        </details>
       </div>
       <form id="search-form" class="search-panel" hidden>
         <label for="query">要查找的文言</label>
@@ -412,11 +441,11 @@ main.is-home {
     <p class="guide-flow">先选择含 Master DB 工作表的 Excel，再输入文言或 LID，按 <kbd>Enter</kbd> 搜索。点选结果查看 18 语种译文，可先改参考格式再复制。</p>
     <dl class="guide-tips">
       <dt>更换词库</dt>
-      <dd>选择新版 Excel 即可更新。词库只在当前页面使用，刷新后需重新导入。</dd>
+      <dd>首次导入后，刷新会恢复当前词库。上传新版会保留旧版，可通过「本机词库」切换。清除站点数据会删除本机记录。</dd>
       <dt>快速查找与全选</dt>
       <dd><kbd>Ctrl</kbd> + <kbd>F</kbd> 随时聚焦并全选查询。输入新文言后按 <kbd>Enter</kbd> 搜索。<kbd>Ctrl</kbd> + <kbd>A</kbd> 默认全选查询，编辑参考格式时全选当前译文。</dd>
       <dt>编辑参考格式</dt>
-      <dd>直接修改或补填，Excel 原文照常保留。切换候选会保留改动，刷新或关闭页面会恢复默认。</dd>
+      <dd>直接修改或补填。离开编辑框后保存并记录修改前后的内容；原始 Excel 保持原样。记录只在当前浏览器可见。</dd>
       <dt>单条与整行复制</dt>
       <dd>「复制」取当前语种的参考格式。「复制整行」取当前记录的 54 列，包含已编辑的内容。可从飞书目标行的韩文格（values-ko）粘贴。</dd>
       <dt>筛选与候选</dt>
@@ -602,7 +631,6 @@ async function importWorkbook(file, report) {
   const blockSize = 1024;
   const blocks = [];
   const records = [];
-  const rowIndices = new Map();
   const data = new Uint32Array(keys.length);
   const cellPattern = /<c(?=[\s/>])([^>]*?)(?:\/>|>([\s\S]*?)<\/c\s*>)/g;
   let columns;
@@ -641,7 +669,6 @@ async function importWorkbook(file, report) {
     const start = position % blockSize * (columnCount + 1);
     blocks.at(-1).set(data.subarray(3), start);
     blocks.at(-1)[start + columnCount] = drafts;
-    rowIndices.set(rowNumber, position);
     records.push([rowNumber, strings[lid], strings[ux], strings[component], strings[data[8]], strings[data[4]], strings[data[3]]]);
     if (records.length % 4096 === 0) {
       report("已读取 " + number.format(records.length) + " 条…");
@@ -649,8 +676,14 @@ async function importWorkbook(file, report) {
     }
   }
   if (!records.length) throw new Error("Master DB 中没有可导入的文言。");
+  return { records, blocks, strings };
+}
+
+function restoreWorkbook({ records, blocks, strings }) {
+  const columnCount = translationColumns.length;
+  const blockSize = 1024;
+  const rowIndices = new Map(records.map(([row], index) => [row, index]));
   return {
-    records,
     readRow(row) {
       const position = rowIndices.get(row);
       const block = blocks[Math.floor(position / blockSize)];
@@ -1056,6 +1089,21 @@ async function showDetail(match, button) {
       copy.setAttribute("aria-label", "复制" + label);
       copy.disabled = !editor.value;
       copy.onclick = () => copyText(editor.value, label);
+      let lastSaved = editor.value;
+      const catalogId = activeCatalogId;
+      editor.addEventListener("change", () => {
+        const next = editor.value;
+        if (next === lastSaved) return;
+        const previous = lastSaved;
+        lastSaved = next;
+        saveChange({ catalogId, row: match.row[0], lid: lid || ux, position, locale: label,
+          original: initial, previous, next, author: el("editor-name").value.trim() || "本机用户" })
+          .then(() => { if (catalogId === activeCatalogId) return refreshHistory(); })
+          .catch(() => {
+            lastSaved = previous;
+            el("import-status").textContent = "译文修改未能保存到浏览器。";
+          });
+      });
       editor.addEventListener("input", () => {
         copyValues[position] = editor.value;
         copy.disabled = !editor.value;
@@ -1249,44 +1297,233 @@ el("query").addEventListener("keydown", (event) => {
 
 const fileInput = el("catalog-file");
 const chooseCatalog = el("choose-catalog");
+const versionSelect = el("catalog-version");
+const importStatus = el("import-status");
+let activeCatalogId;
+let database;
+let historyLimit = 50;
+
+function openStorage() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("text-lookup-local", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      db.createObjectStore("versions", { keyPath: "id" });
+      db.createObjectStore("catalogs");
+      const edits = db.createObjectStore("edits", { keyPath: ["catalogId", "row", "position"] });
+      edits.createIndex("catalogId", "catalogId");
+      const audit = db.createObjectStore("audit", { autoIncrement: true });
+      audit.createIndex("catalogId", "catalogId");
+      db.createObjectStore("settings");
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error("请关闭此网站的其他标签页后重试。"));
+  });
+}
+
+function storageRead(store, getRequest) {
+  return new Promise((resolve, reject) => {
+    const request = getRequest(database.transaction(store).objectStore(store));
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function storageWrite(stores, schedule) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(stores, "readwrite");
+    transaction.oncomplete = resolve;
+    transaction.onabort = () => reject(transaction.error ?? new Error("本机保存失败"));
+    try {
+      schedule(transaction);
+    } catch (error) {
+      transaction.abort();
+      reject(error);
+    }
+  });
+}
+
+function saveChange(change) {
+  return storageWrite(["edits", "audit"], (tx) => {
+    const edits = tx.objectStore("edits");
+    const key = [change.catalogId, change.row, change.position];
+    const current = edits.get(key);
+    current.onsuccess = () => {
+      const previous = current.result?.next ?? change.original;
+      if (previous === change.next) return;
+      if (change.next === change.original) edits.delete(key);
+      else edits.put(change);
+      tx.objectStore("audit").add({ ...change, previous, time: Date.now() });
+    };
+  });
+}
+
+async function refreshHistory() {
+  if (!activeCatalogId) return;
+  const id = activeCatalogId;
+  const limit = historyLimit;
+  const changes = await new Promise((resolve, reject) => {
+    const index = database.transaction("audit").objectStore("audit").index("catalogId");
+    const request = index.openCursor(IDBKeyRange.only(id), "prev");
+    const recent = [];
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor || recent.length > limit) return resolve(recent);
+      recent.push(cursor.value);
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
+  if (activeCatalogId !== id || historyLimit !== limit) return;
+  el("history-more").hidden = changes.length <= limit;
+  el("history-status").textContent = changes.length
+    ? "已显示 " + Math.min(changes.length, limit) + " 条修改" : "暂无修改记录";
+  el("history-list").replaceChildren(...changes.slice(0, limit).map((entry) => {
+    const info = new Date(entry.time).toLocaleString() + " · " + entry.author
+      + " · " + (entry.lid || "第 " + entry.row + " 行") + " · " + entry.locale;
+    return element("li", info + "\n原值：" + (entry.previous || "（空）")
+      + "\n新值：" + (entry.next || "（空）"));
+  }));
+}
+
+el("history-more").onclick = () => {
+  historyLimit += 50;
+  refreshHistory().catch(() => { el("history-status").textContent = "无法读取更多修改记录。"; });
+};
+
+async function listVersions() {
+  const versions = await storageRead("versions", (store) => store.getAll());
+  versions.sort((a, b) => b.importedAt - a.importedAt);
+  versionSelect.replaceChildren(...versions.map((version) => {
+    const option = element("option", version.label + " · " + new Date(version.importedAt).toLocaleString());
+    option.value = version.id;
+    return option;
+  }));
+  versionSelect.value = activeCatalogId ?? "";
+}
+
+function setBusy(busy) {
+  importing = busy;
+  chooseCatalog.disabled = busy;
+  el("search").disabled = busy || !searchCatalog;
+  versionSelect.disabled = busy;
+}
+
+async function activateVersion(version, workbook, remember) {
+  const edits = await storageRead("edits", (store) => store.index("catalogId").getAll(version.id));
+  const nextSearch = lookupSearch.create(workbook.records);
+  const nextCatalog = restoreWorkbook(workbook);
+  if (remember) {
+    await storageWrite(["settings"], (tx) => tx.objectStore("settings").put(version.id, "active"));
+  }
+
+  catalog = nextCatalog;
+  searchCatalog = nextSearch;
+  activeCatalogId = version.id;
+  historyLimit = 50;
+  referenceEdits.clear();
+  for (const edit of edits) {
+    if (!referenceEdits.has(edit.row)) referenceEdits.set(edit.row, new Map());
+    referenceEdits.get(edit.row).set(edit.position, edit.next);
+  }
+  selection++;
+  clearCopyNotice();
+  el("results").replaceChildren();
+  el("results").parentElement.hidden = true;
+  el("detail").parentElement.hidden = true;
+  el("index-status").textContent = version.label + " · " + number.format(workbook.records.length) + " 条";
+  el("local-tools").hidden = false;
+  el("search-form").hidden = false;
+  chooseCatalog.textContent = "导入新版词库";
+  await listVersions();
+  await refreshHistory();
+}
+
+function savedWorkbook(id) {
+  return storageRead("catalogs", (store) => store.get(id));
+}
+
 chooseCatalog.onclick = () => fileInput.click();
 fileInput.onchange = async () => {
   const file = fileInput.files[0];
   fileInput.value = "";
-  if (!file || importing) return;
-  importing = true;
-  chooseCatalog.disabled = true;
-  el("search").disabled = true;
-  const status = el("import-status");
+  if (!file || importing || !database) return;
+  setBusy(true);
   try {
-    const next = await importWorkbook(file, (message) => { status.textContent = message; });
-    status.textContent = "正在建立检索索引…";
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    const nextSearch = lookupSearch.create(next.records);
-    catalog = next;
-    searchCatalog = nextSearch;
-    referenceEdits.clear();
-    selection++;
-    clearCopyNotice();
-    el("results").replaceChildren();
-    el("results").parentElement.hidden = true;
-    el("detail").parentElement.hidden = true;
-    const version = file.name.replace(/\.xlsx$/i, "").match(/(?:^|[^a-z0-9])v(\d+(?:\.\d+)+)/i);
-    el("index-status").textContent = (version ? "词库 V" + version[1] : file.name)
-      + " · " + number.format(next.records.length) + " 条";
-    el("search-form").hidden = false;
-    chooseCatalog.textContent = "更换词库";
-    status.textContent = "";
+    if (!/\.xlsx$/i.test(file.name)) throw new Error("请选择 .xlsx 文件。");
+    importStatus.textContent = "正在检查词库文件…";
+    const hash = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const id = Array.from(new Uint8Array(hash), (ch) => ch.toString(16).padStart(2, "0")).join("");
+    let version = await storageRead("versions", (store) => store.get(id));
+    let workbook;
+    if (version) {
+      workbook = await savedWorkbook(id);
+    } else {
+      workbook = await importWorkbook(file, (message) => { importStatus.textContent = message; });
+      const versionTag = file.name.replace(/\.xlsx$/i, "").match(/(?:^|[^a-z0-9])v(\d+(?:\.\d+)+)/i);
+      version = {
+        id, importedAt: Date.now(), label: versionTag ? "词库 V" + versionTag[1] : file.name,
+      };
+      importStatus.textContent = "正在保存本机词库…";
+      await storageWrite(["catalogs", "versions"], (tx) => {
+        tx.objectStore("catalogs").put(workbook, id);
+        tx.objectStore("versions").put(version);
+      });
+      if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+    }
+    await activateVersion(version, workbook, true);
+    importStatus.textContent = "";
     el("query").focus();
     el("query").select();
   } catch (error) {
-    status.textContent = "导入失败。 " + error.message;
+    importStatus.textContent = "导入失败。 " + error.message;
   } finally {
-    importing = false;
-    chooseCatalog.disabled = false;
-    el("search").disabled = !searchCatalog;
+    setBusy(false);
   }
 };
+
+versionSelect.onchange = async () => {
+  const id = versionSelect.value;
+  if (importing || id === activeCatalogId) return;
+  setBusy(true);
+  importStatus.textContent = "正在切换词库…";
+  try {
+    const [version, workbook] = await Promise.all([
+      storageRead("versions", (store) => store.get(id)),
+      savedWorkbook(id),
+    ]);
+    await activateVersion(version, workbook, true);
+    importStatus.textContent = "";
+  } catch (error) {
+    versionSelect.value = activeCatalogId;
+    importStatus.textContent = "切换失败。 " + error.message;
+  } finally {
+    setBusy(false);
+  }
+};
+
+(async function restoreSavedVersion() {
+  setBusy(true);
+  try {
+    database = await openStorage();
+    const id = await storageRead("settings", (store) => store.get("active"));
+    if (!id) return;
+    importStatus.textContent = "正在恢复本机词库…";
+    const [version, workbook] = await Promise.all([
+      storageRead("versions", (store) => store.get(id)),
+      savedWorkbook(id),
+    ]);
+    if (!version || !workbook) throw new Error("请重新导入词库。");
+    await activateVersion(version, workbook, false);
+    importStatus.textContent = "";
+  } catch (error) {
+    importStatus.textContent = "无法恢复本机词库。 " + error.message;
+  } finally {
+    setBusy(false);
+    if (!database) chooseCatalog.disabled = true;
+  }
+})();
 
 </script>
 </body>
