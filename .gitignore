@@ -1,0 +1,8 @@
+# 本地词库、索引和离线产物
+/private-data/
+/local-output/
+*.xlsx
+*.xlsm
+*.sqlite
+*.sqlite3
+HyundaiLookup_Light_V*.html
