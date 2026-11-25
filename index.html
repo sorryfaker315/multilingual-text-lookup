@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>多语种文言查库 · 网页版 2.4</title>
+<style>:root {
+  color-scheme: light;
+  font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  color: #172834;
+  background: #edf2f4;
+  --muted: #49616d;
+  --border: #cfdbe1;
+  --green: #07594e;
+  --pale: #e6f3ee;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1280px; margin: auto; padding: 40px 28px; }
+h1 { margin: 0 0 9px; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; }
+h2 { margin: 0 0 10px; font-size: 19px; }
+p { margin: 0; line-height: 1.55; }
+.muted { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 22px; }
+label { font-weight: 650; font-size: 14px; }
+button, select, textarea { font: inherit; }
+button, select { min-height: 38px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 7px; background: white; color: inherit; font-size: 14px; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .55; }
+button:hover:not(:disabled) { border-color: var(--green); }
+:focus-visible { outline: 2px solid #0c7768; outline-offset: 2px; }
+#search { background: var(--green); border-color: var(--green); color: white; font-weight: 700; min-width: 76px; }
+.search-panel, .results-panel, .details-panel { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px; min-width: 0; }
+.search-panel { margin-bottom: 18px; }
+textarea { margin: 9px 0; width: 100%; resize: vertical; min-height: 68px; padding: 10px 12px; border: 1px solid #aebfc8; border-radius: 8px; color: inherit; }
+.search-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.workspace { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(0, 1.9fr); align-items: start; gap: 18px; }
+#results { display: grid; gap: 8px; margin-top: 14px; max-height: 70vh; overflow: auto; padding: 3px; }
+.result { display: block; width: 100%; text-align: left; padding: 12px; }
+.result[aria-pressed="true"] { background: var(--pale); border-color: #358475; }
+.result-preview, .result-reference { display: block; overflow-wrap: anywhere; }
+.result-preview { white-space: pre-wrap; }
+.result-reference, .detail-reference { color: var(--muted); font-size: 12px; margin: 5px 0; overflow-wrap: anywhere; }
+table { border-collapse: collapse; width: 100%; margin-top: 16px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 7px; border-bottom: 1px solid #e1e9ee; }
+thead { background: #f3f7f8; }
+tbody th { width: 100px; }
+.original { white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.missing { color: #754215; }
+.copy { min-height: 28px; font-size: 12px; white-space: nowrap; }
+.uid-value { font-size: 14px; overflow-wrap: anywhere; }
+.copy-feedback {
+  position: fixed;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+.copy-feedback.is-visible {
+  padding: 9px 14px;
+  color: #fff;
+  background: #164138;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px #17283438;
+  font-size: 13px;
+}
+.copy-feedback.is-error { background: #713625; }
+#copy-manual {
+  display: block;
+  margin: 6px 0 0;
+  min-height: 44px;
+  pointer-events: auto;
+}
+#copy-manual[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+@media (max-width: 700px) {
+  main { padding: 22px 12px; }
+  .workspace { grid-template-columns: 1fr; }
+  #results { max-height: 46vh; }
+  .details-panel, .results-panel, .search-panel { padding: 14px; }
+}
+main { max-width: 1200px; padding-top: 32px; }
+.page-header { margin-bottom: 18px; }
+.search-panel > label { display: block; margin-bottom: 8px; }
+.search-bar { display: flex; align-items: start; gap: 10px; }
+.search-bar textarea { flex: 1; min-width: 0; min-height: 44px; margin: 0; resize: vertical; }
+.search-controls { flex-wrap: nowrap; flex-shrink: 0; }
+.search-controls > * { min-height: 44px; }
+.workspace { grid-template-columns: minmax(235px, 1fr) minmax(0, 2.35fr); }
+.workspace:has(.details-panel[hidden]) { grid-template-columns: 1fr; }
+h2 { margin-bottom: 7px; }
+#results:empty { margin: 0; padding: 0; }
+.result-reference { margin-bottom: 0; }
+.detail-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.uid-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#copy-row { color: var(--green); background: var(--pale); font-weight: 650; }
+.table-wrap { overflow-x: auto; }
+table { table-layout: fixed; }
+th:first-child { width: 88px; }
+th:last-child { width: 66px; }
+td { overflow-wrap: anywhere; }
+td.draft { background: #eef1f3; }
+@media (max-width: 760px) {
+  main { padding: 22px 12px; }
+  .workspace { grid-template-columns: 1fr; }
+  .search-bar { flex-wrap: wrap; }
+  .search-bar textarea { flex-basis: 100%; }
+  .search-controls { margin-left: auto; }
+  #results { max-height: 32vh; }
+  th:first-child { width: 66px; }
+  th:last-child { width: 59px; }
+}
+
+/* Keep the search entry point centered until the first query. */
+:root {
+  background: #eef4f2;
+  --border: #d3e0dc;
+  --green: #095b4e;
+}
+main.is-home {
+  display: grid;
+  align-content: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  max-width: none;
+  padding: 32px 20px clamp(40px, 13vh, 120px);
+  background:
+    radial-gradient(ellipse at 50% 43%, #dceee7 0%, transparent 57%),
+    #eef4f2;
+}
+.is-home .lookup-shell {
+  width: min(100%, 740px);
+  margin-inline: auto;
+  padding: clamp(22px, 4vw, 36px);
+  border: 1px solid #d3e2dc;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 12px 36px #214d4120, 0 2px 6px #214d4109;
+}
+.is-home .page-header {
+  justify-content: center;
+  text-align: center;
+  margin-bottom: 26px;
+}
+.is-home h1 {
+  color: #15372e;
+  font-size: clamp(29px, 4.1vw, 42px);
+}
+.is-home .search-panel {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.search-bar textarea {
+  padding: 11px 12px;
+  line-height: 1.4;
+}
+.is-home .search-controls > *, .is-home .search-bar textarea { min-height: 46px; }
+#search:hover:not(:disabled) { background: #074b40; }
+.search-examples:not([hidden]) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 16px;
+}
+.search-examples span {
+  margin-inline-end: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.search-examples button {
+  min-height: 32px;
+  padding: 4px 10px;
+  background: #f4f8f6;
+  color: #20574b;
+  font-size: 13px;
+}
+.search-examples button:hover:not(:disabled) { background: var(--pale); }
+.is-home .workspace { display: none; }
+@media (max-width: 650px) {
+  main.is-home { padding-inline: 14px; }
+  .is-home .search-controls {
+    width: 100%;
+    margin: 0;
+  }
+  .is-home .search-controls select { flex: 1; min-width: 0; }
+}
+
+.result-difference {
+  padding: 0 .12em;
+  border-radius: 3px;
+  background: #ffebb3;
+  color: #653600;
+}
+.result-omission {
+  display: block;
+  margin-top: 3px;
+  color: #704518;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.reference-editor {
+  display: block;
+  field-sizing: content;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  max-height: 10rem;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid #bed2cb;
+  border-radius: 6px;
+  background: #fbfdfc;
+  color: inherit;
+  line-height: 1.4;
+  unicode-bidi: plaintext;
+}
+.reference-editor:focus {
+  background: white;
+}
+
+/* The guide shares a grid with the lookup so it never covers controls. */
+.lookup-content { display: contents; }
+main.is-home {
+  grid-template-columns: minmax(0, 680px) minmax(0, 338px);
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+.is-home .lookup-shell { width: 100%; }
+.guide {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.is-home .guide {
+  border-radius: 20px;
+  box-shadow: 0 8px 24px #214d4112;
+}
+.guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.guide h2 { margin: 0; color: #15372e; }
+#guide-close {
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+}
+.guide-toggle { flex: none; margin-top: 4px; color: var(--green); }
+.guide-flow {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #edf6f2;
+  color: #214d42;
+  font-size: 14px;
+}
+.guide-tips { margin: 14px 0 0; }
+.guide-tips dt { margin-top: 11px; color: #214d42; font-size: 14px; font-weight: 700; }
+.guide-tips dd { margin: 3px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.guide kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid #cbded6;
+  border-radius: 4px;
+  background: #fff;
+  font-size: .9em;
+  font-family: inherit;
+}
+@media (min-width: 1080px) {
+  main.has-guide:not(.is-home) {
+    max-width: 1540px;
+    display: grid;
+    align-items: start;
+    column-gap: 18px;
+    grid-template-columns: minmax(0, 1fr) minmax(252px, 300px);
+  }
+  .has-guide:not(.is-home) .lookup-shell,
+  .has-guide:not(.is-home) .workspace { grid-column: 1; }
+  .has-guide:not(.is-home) > .guide {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 40px);
+  }
+}
+@media (max-width: 840px) {
+  main.is-home {
+    grid-template-columns: minmax(0, 640px);
+    align-content: start;
+    padding-block: clamp(24px, 6vh, 60px);
+    gap: 14px;
+  }
+}
+@media (max-width: 1079px) {
+  main.has-guide:not(.is-home) {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    padding-block: 12px;
+    gap: 10px;
+  }
+  .has-guide:not(.is-home) .page-header,
+  .has-guide:not(.is-home) .search-panel { margin-bottom: 8px; }
+  .has-guide:not(.is-home) > .guide {
+    grid-row: 1;
+    max-height: 25vh;
+    max-height: 25dvh;
+    padding: 10px 14px;
+  }
+  .has-guide:not(.is-home) > .lookup-content {
+    display: block;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+.import-panel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+.is-home .import-panel { justify-content: center; margin-bottom: 0; }
+#import-status { flex-basis: 100%; }
+.is-home #import-status { text-align: center; }
+#choose-catalog {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-weight: 700;
+}
+#import-status:empty { display: none; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main id="lookup" class="is-home has-guide">
+  <div class="lookup-content">
+    <div class="lookup-shell">
+      <header class="page-header">
+        <div>
+          <h1>多语种文言查库</h1>
+          <p class="muted"><span>网页版 2.4</span> · <span id="index-status" role="status">尚未导入词库</span></p>
+        </div>
+        <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true"
+          aria-controls="usage-guide" hidden>使用说明</button>
+      </header>
+      <div class="import-panel">
+        <input id="catalog-file" type="file" accept=".xlsx" hidden>
+        <button id="choose-catalog" type="button">导入本机词库</button>
+        <span class="muted">支持 .xlsx，文件仅在浏览器内读取。</span>
+        <p id="import-status" class="muted" role="status"></p>
+      </div>
+      <form id="search-form" class="search-panel" hidden>
+        <label for="query">要查找的文言</label>
+        <div class="search-bar">
+          <textarea id="query" rows="1" required placeholder="简中、韩文、美式英语或 LID"></textarea>
+          <div class="search-controls">
+            <label class="sr-only" for="language">搜索语种</label>
+            <select id="language">
+              <option value="auto">自动检测</option>
+              <option value="zh">简中</option>
+              <option value="ko">韩文</option>
+              <option value="en">美式英语</option>
+            </select>
+            <button id="search" type="submit" disabled>搜索</button>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="workspace">
+      <section class="results-panel" aria-labelledby="results-heading" hidden>
+        <h2 id="results-heading">检索结果</h2>
+        <p id="result-status" class="muted" role="status"></p>
+        <div id="results"></div>
+      </section>
+      <section class="details-panel" aria-label="译文详情" hidden>
+        <div id="detail"></div>
+      </section>
+    </div>
+  </div>
+  <aside id="usage-guide" class="guide" aria-labelledby="guide-heading">
+    <div class="guide-header">
+      <h2 id="guide-heading">使用说明</h2>
+      <button id="guide-close" type="button" aria-label="收起使用说明" title="收起使用说明" hidden>×</button>
+    </div>
+    <p class="guide-flow">先选择含 Master DB 工作表的 Excel，再输入文言或 LID，按 <kbd>Enter</kbd> 搜索。点选结果查看 18 语种译文，可先改参考格式再复制。</p>
+    <dl class="guide-tips">
+      <dt>更换词库</dt>
+      <dd>选择新版 Excel 即可更新。词库只在当前页面使用，刷新后需重新导入。</dd>
+      <dt>快速查找与全选</dt>
+      <dd><kbd>Ctrl</kbd> + <kbd>F</kbd> 随时聚焦并全选查询。输入新文言后按 <kbd>Enter</kbd> 搜索。<kbd>Ctrl</kbd> + <kbd>A</kbd> 默认全选查询，编辑参考格式时全选当前译文。</dd>
+      <dt>编辑参考格式</dt>
+      <dd>直接修改或补填，Excel 原文照常保留。切换候选会保留改动，刷新或关闭页面会恢复默认。</dd>
+      <dt>单条与整行复制</dt>
+      <dd>「复制」取当前语种的参考格式。「复制整行」取当前记录的 54 列，包含已编辑的内容。可从飞书目标行的韩文格（values-ko）粘贴。</dd>
+      <dt>筛选与候选</dt>
+      <dd>可用下拉菜单限定简中、韩文或美式英语。优先查 ID 或规范化一致的文言，未命中时给出最多 5 条相关候选，黄色标出与查询不同的文字。文字加双引号可只查完整文言。</dd>
+    </dl>
+  </aside>
+</main>
+<div id="copy-feedback" class="copy-feedback">
+  <p id="copy-status" role="status" aria-atomic="true"></p>
+  <textarea id="copy-manual" aria-label="待复制内容" rows="2" readonly hidden></textarea>
+</div>
+<script>
+const localeColumns = [["Korean", "韩文"], ["English US", "美式英语"], ["Spanish (Mexico)", "墨西哥西语"], ["French (Canada)", "加拿大法语"], ["Portuguese (Brazil)", "巴西葡语"], ["Chinese (Simplified, China)", "简中"], ["Japanese", "日语"], ["English AU", "澳式英语"], ["English UK", "英式英语"], ["French (France)", "欧洲法语"], ["Russian", "俄语"], ["Arabic", "阿拉伯语"], ["Chinese (Traditional, Taiwan)", "繁中"], ["Indonesian", "印尼语"], ["Vietnamese", "越南语"], ["Thai", "泰语"], ["Kazakh", "哈萨克语"], ["Uzbek", "乌兹别克语"]];
+const translationColumns = ["Korean", "English US", "Spanish (Mexico)", "French (Canada)", "Portuguese (Brazil)", "Chinese (Simplified, China)", "Japanese", "English AU", "English UK", "German", "French (France)", "Italian", "Spanish (Spain)", "Portuguese (Portugal)", "Romanian", "Dutch", "Danish", "Swedish", "Norwegian", "Polish", "Czech", "Slovak", "Russian", "Ukrainian", "Slovenian", "Croatian", "Bulgarian", "Lithuanian", "Latvian", "Greek", "Finnish", "Estonian", "Hungarian", "Turkish", "Arabic", "Hindi", "Bengali", "Marathi", "Telugu", "Tamil", "Gujarati", "Kannada", "Oriya", "Malayalam", "Punjabi", "Chinese (Traditional, Taiwan)", "Indonesian", "Malay", "Vietnamese", "Thai", "Persian", "Hebrew", "Kazakh", "Uzbek"];
+async function openWorkbookZip(file) {
+  const tailStart = Math.max(0, file.size - 65557);
+  const tail = new DataView(await file.slice(tailStart).arrayBuffer());
+  let end = tail.byteLength - 22;
+  while (end >= 0 && (tail.getUint32(end, true) !== 0x06054b50
+    || end + 22 + tail.getUint16(end + 20, true) !== tail.byteLength)) end--;
+  if (end < 0) throw new Error("文件无法作为 .xlsx 打开。请检查文件格式或是否加密。");
+  const count = tail.getUint16(end + 10, true);
+  const size = tail.getUint32(end + 12, true);
+  const offset = tail.getUint32(end + 16, true);
+  if (count === 65535 || size === 0xffffffff || offset + size > tailStart + end
+    || tail.getUint16(end + 4, true) || tail.getUint16(end + 6, true)) {
+    throw new Error("此 Excel 的压缩包格式不受支持。");
+  }
+
+  const directory = new DataView(await file.slice(offset, offset + size).arrayBuffer());
+  const decoder = new TextDecoder();
+  const entries = new Map();
+  let cursor = 0;
+  for (let i = 0; i < count; i++) {
+    if (directory.getUint32(cursor, true) !== 0x02014b50) throw new Error("Excel 文件目录损坏。");
+    const nameLength = directory.getUint16(cursor + 28, true);
+    const extraLength = directory.getUint16(cursor + 30, true);
+    const commentLength = directory.getUint16(cursor + 32, true);
+    const name = decoder.decode(new Uint8Array(directory.buffer, cursor + 46, nameLength));
+    entries.set(name, {
+      compression: directory.getUint16(cursor + 10, true),
+      size: directory.getUint32(cursor + 20, true),
+      offset: directory.getUint32(cursor + 42, true),
+      encrypted: directory.getUint16(cursor + 8, true) & 1,
+    });
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+
+  return async (path) => {
+    const entry = entries.get(path);
+    if (!entry || entry.encrypted) throw new Error("Excel 缺少所需内容或该内容已加密。");
+    const header = new DataView(await file.slice(entry.offset, entry.offset + 30).arrayBuffer());
+    if (header.getUint32(0, true) !== 0x04034b50) throw new Error("Excel 文件结构损坏。");
+    const start = entry.offset + 30 + header.getUint16(26, true) + header.getUint16(28, true);
+    if (start + entry.size > offset) throw new Error("Excel 内容不完整。");
+    const stream = file.slice(start, start + entry.size).stream();
+    if (entry.compression === 0) return stream;
+    if (entry.compression !== 8) throw new Error("此 Excel 的压缩格式不受支持。");
+    try {
+      return stream.pipeThrough(new DecompressionStream("deflate-raw"));
+    } catch {
+      throw new Error("此浏览器无法解压 Excel，请使用支持 Excel 导入的新版 Chrome 或 Edge。");
+    }
+  };
+}
+
+const xmlEntities = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+function decodeXml(text) {
+  return text.replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, code) => {
+    if (code.startsWith("#")) {
+      const hex = code[1].toLowerCase() === "x";
+      return String.fromCodePoint(parseInt(code.slice(hex ? 2 : 1), hex ? 16 : 10));
+    }
+    return xmlEntities[code];
+  });
+}
+
+function richText(xml) {
+  if (!xml.includes("<t")) return "";
+  const text = Array.from(xml.replace(/<rPh\b[^>]*>[\s\S]*?<\/rPh>/g, "")
+    .matchAll(/<t(?:\s[^>]*)?>([^<]*)<\/t\s*>/g), (match) => decodeXml(match[1])).join("");
+  return text.replace(/_x([\da-f]{4})_/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+}
+
+async function* workbookElements(stream, tag) {
+  const reader = stream.pipeThrough(new TextDecoderStream("utf-8", { fatal: true })).getReader();
+  const pattern = new RegExp("<" + tag + "(?=[\\s/>])[^>]*?(?:\\/>|>[\\s\\S]*?<\\/" + tag + "\\s*>)", "g");
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let end = 0;
+      pattern.lastIndex = 0;
+      for (let match; (match = pattern.exec(buffer));) {
+        end = pattern.lastIndex;
+        yield match[0];
+      }
+      buffer = buffer.slice(end);
+      if (buffer.length > 16 * 1024 * 1024) throw new Error("Excel 单条记录过大或内容损坏。");
+    }
+    if (buffer.includes("<" + tag + " ") || buffer.includes("<" + tag + ">")) {
+      throw new Error("Excel 内容不完整。");
+    }
+  } finally {
+    await reader.cancel();
+    reader.releaseLock();
+  }
+}
+
+async function importWorkbook(file, report) {
+  if (!/\.xlsx$/i.test(file.name)) throw new Error("请选择 .xlsx 文件。");
+  report("正在读取 Excel…");
+  const open = await openWorkbookZip(file);
+  async function readDocument(path) {
+    const text = await new Response(await open(path)).text();
+    if (/<!DOCTYPE/i.test(text)) throw new Error("Excel 包含不受支持的 XML 定义。");
+    const doc = new DOMParser().parseFromString(text, "application/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("Excel 中的 XML 无法读取。");
+    return doc;
+  }
+
+  const book = await readDocument("xl/workbook.xml");
+  const relations = await readDocument("xl/_rels/workbook.xml.rels");
+  const links = [...relations.getElementsByTagNameNS("*", "Relationship")];
+  const sheet = [...book.getElementsByTagNameNS("*", "sheet")].find((item) => item.getAttribute("name") === "Master DB");
+  if (!sheet) throw new Error("找不到 Master DB 工作表。");
+  const relationId = sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id")
+    || sheet.getAttribute("r:id");
+  const sheetLink = links.find((link) => link.getAttribute("Id") === relationId);
+  function partPath(link) {
+    const target = link?.getAttribute("Target");
+    if (!target || link.getAttribute("TargetMode") === "External") throw new Error("Excel 引用了无效的工作表或数据。");
+    return new URL(target, "https://xlsx.invalid/xl/workbook.xml").pathname.slice(1);
+  }
+  const findPart = (type) => links.find((link) => link.getAttribute("Type").endsWith("/" + type));
+
+  const strings = [""];
+  const shared = findPart("sharedStrings");
+  if (shared) {
+    report("正在读取共享文言…");
+    for await (const item of workbookElements(await open(partPath(shared)), "si")) strings.push(richText(item));
+  }
+  const sharedCount = strings.length - 1;
+  const inline = new Map([["", 0]]);
+  function textIndex(value) {
+    if (inline.has(value)) return inline.get(value);
+    const index = strings.length;
+    strings.push(value);
+    inline.set(value, index);
+    return index;
+  }
+
+  const grayStyles = new Set();
+  const styles = findPart("styles");
+  if (styles) {
+    const doc = await readDocument(partPath(styles));
+    const fills = doc.getElementsByTagNameNS("*", "fills")[0]?.children ?? [];
+    const formats = doc.getElementsByTagNameNS("*", "cellXfs")[0]?.children ?? [];
+    for (const [index, format] of Array.from(formats).entries()) {
+      const fill = fills[Number(format.getAttribute("fillId"))];
+      const color = fill?.getElementsByTagNameNS("*", "fgColor")[0]?.getAttribute("rgb");
+      if (color?.slice(-6).toUpperCase() === "E7E6E6") grayStyles.add(String(index));
+    }
+  }
+
+  function cellIndex(attrs, content) {
+    const kind = /\bt="([^"]+)"/.exec(attrs)?.[1];
+    if (kind === "inlineStr") return textIndex(richText(content));
+    if (kind === "e") return 0;
+    const value = /<v(?:\s[^>]*)?>([^<]*)<\/v\s*>/.exec(content)?.[1];
+    if (value === undefined) return 0;
+    if (kind !== "s") return textIndex(decodeXml(value));
+    const index = Number(value) + 1;
+    if (!Number.isInteger(index) || index < 1 || index > sharedCount) throw new Error("Excel 的共享文本索引无效。");
+    return index;
+  }
+
+  const keys = ["Standard LID", "UX LID", "Component", ...translationColumns];
+  const columnCount = translationColumns.length;
+  const draftBits = new Map(projectPositions.map((index, bit) => [index + 3, 1 << bit]));
+  const blockSize = 1024;
+  const blocks = [];
+  const records = [];
+  const rowIndices = new Map();
+  const data = new Uint32Array(keys.length);
+  const cellPattern = /<c(?=[\s/>])([^>]*?)(?:\/>|>([\s\S]*?)<\/c\s*>)/g;
+  let columns;
+  report("正在读取 Master DB…");
+  for await (const row of workbookElements(await open(partPath(sheetLink)), "row")) {
+    const rowNumber = Number(/\br="(\d+)"/.exec(row.slice(0, row.indexOf(">")))?.[1]);
+    if (!rowNumber) throw new Error("工作表缺少有效的行号。");
+    if (!columns) {
+      if (rowNumber !== 1) throw new Error("Master DB 缺少第 1 行表头。");
+      const headers = new Map();
+      for (const [, attrs, value = ""] of row.matchAll(cellPattern)) {
+        const name = strings[cellIndex(attrs, value)].trim();
+        const column = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
+        headers.set(name, column);
+      }
+      const missing = keys.filter((name) => !headers.get(name));
+      if (missing.length) throw new Error("缺少表头 " + missing.join("、"));
+      columns = new Map(keys.map((key, index) => [headers.get(key), index]));
+      continue;
+    }
+
+    data.fill(0);
+    let drafts = 0;
+    for (const [, attrs, content = ""] of row.matchAll(cellPattern)) {
+      const column = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
+      const position = columns.get(column);
+      if (position === undefined) continue;
+      data[position] = cellIndex(attrs, content);
+      const bit = draftBits.get(position);
+      if (bit && grayStyles.has(/\bs="(\d+)"/.exec(attrs)?.[1])) drafts |= bit;
+    }
+    const [lid, ux, component] = data;
+    if (!lid && !ux && !data.subarray(3).some((index) => strings[index])) continue;
+    const position = records.length;
+    if (position % blockSize === 0) blocks.push(new Uint32Array(blockSize * (columnCount + 1)));
+    const start = position % blockSize * (columnCount + 1);
+    blocks.at(-1).set(data.subarray(3), start);
+    blocks.at(-1)[start + columnCount] = drafts;
+    rowIndices.set(rowNumber, position);
+    records.push([rowNumber, strings[lid], strings[ux], strings[component], strings[data[8]], strings[data[4]], strings[data[3]]]);
+    if (records.length % 4096 === 0) {
+      report("已读取 " + number.format(records.length) + " 条…");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+  if (!records.length) throw new Error("Master DB 中没有可导入的文言。");
+  return {
+    records,
+    readRow(row) {
+      const position = rowIndices.get(row);
+      const block = blocks[Math.floor(position / blockSize)];
+      const start = position % blockSize * (columnCount + 1);
+      const translations = Array.from(block.subarray(start, start + columnCount), (id) => strings[id]);
+      return [...records[position].slice(1, 4), block[start + columnCount], translations];
+    },
+  };
+}
+
+const lookupSearch = (() => {
+  const languageColumns = { zh: 4, en: 5, ko: 6 };
+  const fieldEntries = Object.entries(languageColumns);
+  const objects = [
+    ["fuel", "燃油口", /油箱盖|燃油口|加油口|油箱门/i, /\bfuel\s*(?:filler|door|cap)|\bgas\s*(?:cap|door)/i, /연료\s*주입구|주유구|연료\s*도어/],
+    ["charge", "充电口", /充电[口门盖]|充电接口/, /\bcharg(?:ing|e)\s*(?:door|port|inlet|cover)\b/i, /충전\s*(?:도어|구|포트|커버)/],
+    ["brake", "刹车踏板", /刹车踏板|制动踏板|踩(?:下)?刹车/, /\bbrake\s+pedal\b/i, /브레이크\s*(?:페달|를\s*밟)/],
+    ["parking", "驻车制动", /驻车制动|手刹|电子手刹/, /\bparking\s+brake\b/i, /주차\s*브레이크/],
+    ["belt", "安全带", /安全带/, /\bseat\s*belts?\b/i, /안전\s*벨트/],
+    ["trunk", "后备厢", /后备[厢箱]|尾门|行李[厢箱]/, /\b(?:tailgate|liftgate|trunk)\b/i, /트렁크|테일게이트/],
+    ["tire", "胎压", /胎压|轮胎气压/, /\bti[ry]e\s+pressure\b/i, /타이어\s*공기압/],
+    ["bluetooth", "蓝牙", /蓝牙/, /\bbluetooth\b/i, /블루투스/],
+    ["climate", "空调", /空调|温控/, /\b(?:air\s+conditioning|climate\s+control)\b/i, /에어컨|공조/],
+    ["cruise", "巡航控制", /巡航/, /\bcruise\s+control\b/i, /크루즈\s*컨트롤/],
+    ["cluster", "仪表盘", /仪表盘|组合仪表/, /\b(?:instrument\s+(?:panel|cluster)|cluster)\b/i, /클러스터|계기판/],
+  ];
+  const actions = [
+    ["open", "打开", /^(?:请)?(?:打开|开启|掀开)|(?:正在|无法|不能|从外面)打开/, /^(?:please\s+)?open(?:ing)?\b|\b(?:to|cannot be)\s+open(?:ed)?\b/i, /열어|열게|여십시오|열 수/],
+    ["close", "关闭", /^(?:请)?(?:关闭|关上|合上)|(?:正在|无法|不能)关闭/, /^(?:please\s+)?clos(?:e|ing)\b|\bto\s+close\b/i, /닫아|닫으십시오|닫을게/],
+    ["start", "启动", /启动|起动|点火/, /\b(?:start(?:ing)?|ignition)\b/i, /시동/],
+    ["check", "检查", /^(?:请)?(?:检查|查看)/, /^(?:please\s+)?check\b/i, /점검.*(?:십시오|하세요)/],
+    ["connect", "连接", /^(?:请)?(?:连接|配对)/, /^(?:please\s+)?(?:connect|pair)\b/i, /연결하십시오|페어링하십시오/],
+  ];
+  function normalize(text) {
+    return text.normalize("NFKC").toLowerCase().replace(/ß/gu, "ss").replace(/ς/gu, "σ")
+      .replace(/[\s\u001c-\u001f\u0085\u200b\u2060]/gu, "");
+  }
+
+  function matches(rules, text, language) {
+    const position = languageColumns[language] - 2;
+    return rules.filter((rule) => rule[position].test(text)).map((rule) => rule[0]);
+  }
+
+  function profile(text, language) {
+    text = language === "zh" ? text.replace(/\s+/gu, "") : text.trim().replace(/\s+/gu, " ");
+    const entity = matches(objects, text, language);
+    const action = matches(actions, text, language)[0];
+    const state = /未关|没关|没有关闭|未关闭|未锁|还开着|(?:not|isn.t)\s+closed|ajar|열려\s*있|닫히지/i.test(text) ? "未关闭"
+      : /无法|不能|打不开|关不上|cannot|can.t|unable|수\s*없/i.test(text) ? "无法执行"
+      : /已开|已开启|已打开|\b(?:door|port|cover)\s+(?:is\s+)?open\b|도어\s*열림/i.test(text) ? "已开启"
+      : /已关闭|已关|\b(?:door|port|cover)\s+(?:is\s+)?closed\b|도어\s*닫힘/i.test(text) ? "已关闭"
+      : /正在|\b(?:opening|closing)\b|열게요|닫을게요/i.test(text) ? "执行中" : "";
+    const variant = /\bauto(?:matic)?\s*start\b|自动启动|오토\s*스타트|자동\s*시동/i.test(text) ? "auto"
+      : /启动发动机|\bstart\s+(?:the\s+)?engine\b/i.test(text) ? "engine"
+      : /\bstart\s+(?:the\s+)?vehicle\b/i.test(text) ? "vehicle" : "";
+    const prompt = state || /^(?:请(?!求)|请您)|(?:십시오|세요|습니다|입니다|합니다|됩니다)[.!。]?\s*$|\bpress\b.+\bto\b|\bpress\b.+\bfor\b|[!?！？]/i.test(text);
+    const use = prompt ? "prompt" : action && action !== "start" && action !== "check" ? "button" : "name";
+    return { entity, action, state, variant, use };
+  }
+
+  function detect(text) {
+    if (/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/u.test(text)) return "ko";
+    if (/\p{Script=Han}/u.test(text)) return "zh";
+    return "en";
+  }
+
+  function literal(text) {
+    return /[%{}<>\[\]\\/@=_`]|https?:|\b\d+\.\d+\b|\b[A-Z]{1,8}-?\d+\b/i.test(text);
+  }
+
+  function possibleName(text, language, info) {
+    if (info.use !== "name" || info.action || literal(text) || /[。.!?！？;；:：,，\r\n]/u.test(text)) return false;
+    if (language === "zh") return /^[\p{Script=Han}\p{L}\s]{1,14}$/u.test(text)
+      && !/请|正在|必须|应当|无法|不能|尚|未|已|等待|失败|成功|欢迎|重试|保持|停止|需要|还在|可用|仅在/.test(text);
+    if (language === "ko") return /^[\p{L}\s-]{1,28}$/u.test(text);
+    return /^[\p{L}\s'-]{1,36}$/u.test(text) && text.split(/\s+/).length <= 4
+      && !/\b(?:you|your|should|must|is|are|was|were|please|press|tap|keep|hold|check|do|did|enable|disable|put|select|use|insert|remove|stop|set|turn|start|contact|avoid|wait|switch|restart|retry|confirm|ensure|make|unavailable|failed|detected)\b/i.test(text);
+  }
+
+
+  function grams(text, width) {
+    const points = Array.from(text);
+    const parts = new Set();
+    for (let i = 0; i + width <= points.length; i++) {
+      parts.add(points.slice(i, i + width).join(""));
+    }
+    return parts;
+  }
+
+  function sharedEdges(left, right) {
+    const length = Math.min(left.length, right.length);
+    let prefix = 0;
+    let suffix = 0;
+    while (prefix < length && left[prefix] === right[prefix]) prefix++;
+    while (prefix + suffix < length
+      && left[left.length - 1 - suffix] === right[right.length - 1 - suffix]) suffix++;
+    return { prefix, suffix };
+  }
+
+  function sharesSentenceFrame(query, candidate, language) {
+    const side = language === "en" ? 4 : 2;
+    const length = Math.max(query.length, candidate.length);
+    if (Math.abs(query.length - candidate.length) > Math.max(5, query.length / 3)
+      || !candidate.startsWith(query.slice(0, side))
+      || !candidate.endsWith(query.slice(-side))) return false;
+    const { prefix, suffix } = sharedEdges(query, candidate);
+    const shared = prefix + suffix;
+    return prefix >= side && suffix >= side
+      && shared >= (language === "en" ? 9 : 5) && shared / length >= 0.6;
+  }
+
+  function create(records) {
+    const rows = records.map((row) => ({
+      row, keys: row.slice(4).map(normalize), ids: row.slice(1, 3).map(normalize),
+    }));
+
+    return ({ query, language }) => {
+      const strict = /^(?:"[\s\S]+"|“[\s\S]+”)$/u.test(query);
+      const text = strict ? query.slice(1, -1).trim() : query;
+      const key = normalize(text);
+      if (!key) return { matches: [] };
+      const primary = language === "auto" ? detect(text.normalize("NFKC")) : language;
+      const fields = language === "auto"
+        ? [primary, ...fieldEntries.map(([lang]) => lang).filter((lang) => lang !== primary)]
+        : [primary];
+      const makeMatch = (entry, field) => ({ row: entry.row, field });
+      const findText = (value) => {
+        const found = [];
+        const seen = new Set();
+        for (const field of fields) {
+          const column = languageColumns[field] - 4;
+          for (const entry of rows) {
+            if (entry.keys[column] === value && !seen.has(entry.row[0])) {
+              seen.add(entry.row[0]);
+              found.push(makeMatch(entry, field));
+            }
+          }
+        }
+        return found;
+      };
+
+      const ids = rows.filter((entry) => entry.ids.includes(key));
+      if (ids.length) return { kind: "ID 命中", matches: ids.map((entry) => makeMatch(entry, primary)) };
+      const exact = findText(key);
+      if (exact.length) return { kind: "规范化一致", matches: exact };
+      if (strict || literal(text)) return { matches: [] };
+
+      const bare = text.replace(/[。．.]$/u, "").trimEnd();
+      if (bare !== text && possibleName(bare, primary, profile(bare, primary))) {
+        const names = findText(normalize(bare));
+        if (names.length) return { kind: "相关候选", matches: names.slice(0, 5) };
+      }
+
+      const width = primary === "en" ? 3 : 2;
+      const fragments = [...grams(key, width)];
+      if (!fragments.length) return { matches: [] };
+      const target = profile(text.normalize("NFKC"), primary);
+      const entityRules = objects.filter(([id]) => target.entity.includes(id));
+      const column = languageColumns[primary];
+      const frameKey = key.replace(/[。.!?！？]+$/u, "");
+      const suggestions = [];
+      for (const entry of rows) {
+        const value = entry.keys[column - 4];
+        if (!value) continue;
+        const overlap = fragments.filter((part) => value.includes(part)).length;
+        const contains = value.includes(key) && (primary !== "en"
+          || entry.row[column].normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}]+/u)
+            .some((word) => word === key) || /\s/u.test(text));
+        const coverage = overlap / fragments.length;
+        const lexical = (2 * overlap) / (fragments.length + Math.max(1, value.length - width + 1));
+        const concept = entityRules.some((rule) => fieldEntries.some(([, i]) => rule[i - 2].test(entry.row[i])));
+        const sameFrame = sharesSentenceFrame(frameKey, value.replace(/[。.!?！？]+$/u, ""), primary);
+        if (!sameFrame && !contains && !(coverage >= 0.6 && lexical >= 0.48) && !concept) continue;
+
+        const signal = profile(entry.row[column].trimStart().replace(/^["“＂]+/u, ""), primary);
+        if ((target.action && !target.state && signal.state)
+          || (target.action && signal.action && target.action !== signal.action)
+          || (target.state && signal.state && target.state !== signal.state)
+          || (target.variant && signal.variant && target.variant !== signal.variant)
+          || (target.entity.length && signal.entity.length
+            && !signal.entity.some((entity) => target.entity.includes(entity)))) continue;
+        if (!contains && !overlap && (!concept || !signal.entity.length
+          || (target.action && signal.action !== target.action)
+          || (target.state && signal.state !== target.state))) continue;
+        const score = lexical * 55 + (contains ? 30 : 0) + (concept ? 24 : 0)
+          + (sameFrame ? 38 : 0)
+          + (target.action && target.action === signal.action ? 14 : 0)
+          + (target.state && target.state === signal.state ? 14 : 0)
+          + (target.use === signal.use ? 5 : 0);
+        suggestions.push({ ...makeMatch(entry, primary), score, action: signal.action, state: signal.state });
+      }
+      suggestions.sort((a, b) => b.score - a.score || a.row[0] - b.row[0]);
+      const matches = [];
+      const displayed = new Set();
+      const sameIntent = suggestions.filter((item) => (target.state || target.action)
+        && (!target.state || item.state === target.state) && (!target.action || item.action === target.action));
+      for (const match of sameIntent.length ? sameIntent : suggestions) {
+        const preview = normalize(match.row[column]).replace(/^["“](.+)["”]$/u, "$1");
+        if (displayed.has(preview)) continue;
+        displayed.add(preview);
+        matches.push(match);
+        if (matches.length === 5) break;
+      }
+      return { kind: "相关候选", matches };
+    };
+  }
+
+  return { create, languageColumns, normalize, sharedEdges };
+})();
+
+const el = (id) => document.getElementById(id);
+const feishuCjk = new Set([5, 6, 45]);
+const number = new Intl.NumberFormat("zh-CN");
+const locales = localeColumns.map(([, label]) => label);
+const projectPositions = localeColumns.map(([name]) => translationColumns.indexOf(name));
+const referenceEdits = new Map();
+let copyNoticeTimer;
+let selection = 0;
+let searchCatalog;
+let catalog;
+let importing = false;
+function element(tag, value = "", className = "") {
+  const node = document.createElement(tag);
+  node.textContent = value;
+  node.className = className;
+  return node;
+}
+
+function optimizeText(value, eastAsian) {
+  const parts = value.split(/(<[^<>\r\n]+>|\{[^{}\r\n]+\}|\[[^\[\]\r\n]*%[^\[\]\r\n]*\]|\$\{[^{}\r\n]+\}|%(?:\d+\$)?[-+#0 ]*\d*(?:\.\d+)?[A-Za-z%])/gu);
+  return parts.map((part, position) => {
+    if (position % 2) return part;
+    let text = part.replace(/\u200b|\ufeff/gu, "").replace(/\s+/gu, " ");
+    if (eastAsian) {
+      const cjk = "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}、。，！？”’）】]";
+      text = text.replace(new RegExp(`(${cjk}) (?=${cjk})`, "gu"), "$1");
+      text = text.replace(/ +(?=[、。，！？；：）】])/gu, "").replace(/([（【“‘]) +/gu, "$1");
+    }
+    return text;
+  }).join("").trim();
+}
+
+function clearCopyNotice() {
+  clearTimeout(copyNoticeTimer);
+  el("copy-feedback").classList.remove("is-visible", "is-error");
+  el("copy-status").textContent = "";
+  const field = el("copy-manual");
+  field.hidden = true;
+  field.value = "";
+}
+
+function showCopyNotice(message, { error = false, manual = false } = {}) {
+  const feedback = el("copy-feedback");
+  clearTimeout(copyNoticeTimer);
+  feedback.classList.add("is-visible");
+  feedback.classList.toggle("is-error", error);
+  el("copy-status").textContent = message;
+  if (!manual) {
+    const field = el("copy-manual");
+    field.hidden = true;
+    field.value = "";
+    copyNoticeTimer = setTimeout(clearCopyNotice, error ? 4200 : 2300);
+  }
+}
+
+function copyLocally(plain, html) {
+  clearCopyNotice();
+  const previousFocus = document.activeElement;
+  const field = el("copy-manual");
+  field.value = plain;
+  field.hidden = false;
+  field.focus({ preventScroll: true });
+  field.select();
+  function onCopy(event) {
+    if (!event.clipboardData) return;
+    event.clipboardData.setData("text/plain", plain);
+    if (html) event.clipboardData.setData("text/html", html);
+    event.preventDefault();
+  }
+  document.addEventListener("copy", onCopy);
+  try {
+    if (document.execCommand("copy")) {
+      previousFocus?.focus({ preventScroll: true });
+      return true;
+    }
+  } catch {
+    // Some browsers disable this clipboard path. Keep the selected text available.
+  } finally {
+    document.removeEventListener("copy", onCopy);
+  }
+  showCopyNotice("内容已选中，请按 Ctrl+C 或 ⌘C 复制。", { manual: true });
+  return false;
+}
+
+async function copyText(value, description) {
+  try {
+    await navigator.clipboard.writeText(value);
+    showCopyNotice(`已复制${description}。`);
+  } catch {
+    if (copyLocally(value)) showCopyNotice(`已复制${description}。`);
+  }
+}
+
+async function copyFeishuRow(values) {
+  const table = document.createElement("table");
+  const row = table.insertRow();
+  const plain = values.map((value) => value.replace(/[\t\r\n]+/g, " ")).join("\t");
+  for (const value of values) {
+    const cell = row.insertCell();
+    cell.style.whiteSpace = "pre-wrap";
+    if (!value) continue;
+    value.split(/\r\n|\r|\n/).forEach((line, index) => {
+      if (index) cell.append(document.createElement("br"));
+      cell.append(document.createTextNode(line));
+    });
+  }
+
+  try {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") throw new Error("HTML clipboard unavailable");
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([table.outerHTML], { type: "text/html" }),
+      "text/plain": new Blob([plain], { type: "text/plain" }),
+    })]);
+    showCopyNotice("已复制 54 列，可从目标行的韩文格粘贴。");
+  } catch {
+    if (copyLocally(plain, table.outerHTML)) {
+      showCopyNotice("已复制 54 列，可从目标行的韩文格粘贴。");
+    }
+  }
+}
+
+
+async function showDetail(match, button) {
+  const token = ++selection;
+  const detail = el("detail");
+  for (const result of el("results").querySelectorAll(".result")) {
+    result.setAttribute("aria-pressed", String(result === button));
+  }
+  detail.parentElement.hidden = false;
+  detail.replaceChildren(element("p", "正在读取译文…", "muted"));
+  clearCopyNotice();
+  try {
+    const [lid, ux, component, drafts, values] = await catalog.readRow(match.row[0]);
+    if (token !== selection) return;
+    const top = element("div", "", "detail-top");
+    const title = element("div");
+    const translations = projectPositions.map((index) => values[index]);
+    const copyValues = values.map((value, index) => optimizeText(value, feishuCjk.has(index)));
+    const rowEdits = referenceEdits.get(match.row[0]) ?? new Map();
+    const count = translations.filter((value) => value.trim()).length;
+    title.append(element("h2", "18 语种译文"));
+    const uid = element("div", "", "uid-row");
+    if (lid) {
+      const copyUid = element("button", "复制 UID", "copy");
+      copyUid.onclick = () => copyText(lid, " UID");
+      uid.append(element("span", lid, "uid-value"), copyUid);
+      title.append(uid);
+    }
+    title.append(element("p", [ux, component, "Master DB 第 " + match.row[0] + " 行",
+      "已有 " + count + " / " + locales.length].filter(Boolean).join(" · "), "detail-reference"));
+    const copyRow = element("button", "复制整行 · 54 列");
+    copyRow.id = "copy-row";
+    copyRow.title = "从飞书目标行的韩文格（values-ko）粘贴";
+    copyRow.onclick = () => copyFeishuRow(copyValues);
+    top.append(title, copyRow);
+    detail.replaceChildren(top);
+
+    const table = element("table");
+    const heading = table.createTHead().insertRow();
+    for (const name of ["语种", "Excel 原文", "参考格式", "操作"]) {
+      const cell = element("th", name);
+      cell.scope = "col";
+      heading.append(cell);
+    }
+    const body = table.createTBody();
+    translations.forEach((value, index) => {
+      const row = body.insertRow();
+      const label = locales[index];
+      const locale = element("th", label);
+      locale.scope = "row";
+      row.append(locale);
+      const original = row.insertCell();
+      const reference = row.insertCell();
+      const action = row.insertCell();
+      const position = projectPositions[index];
+      const initial = copyValues[position];
+      original.append(element("span", value.trim() ? value : "缺失", value.trim() ? "original" : "missing"));
+      if (value.trim() && (drafts & (1 << index))) {
+        original.className = "draft";
+        original.title = "草稿 / 验证";
+      }
+      const editor = element("textarea", "", "reference-editor");
+      editor.rows = 2;
+      editor.dir = "auto";
+      editor.spellcheck = false;
+      editor.placeholder = "—";
+      editor.setAttribute("aria-label", label + "参考格式");
+      editor.value = rowEdits.get(position) ?? initial;
+      copyValues[position] = editor.value;
+      reference.append(editor);
+
+      const copy = element("button", "复制", "copy");
+      copy.setAttribute("aria-label", "复制" + label);
+      copy.disabled = !editor.value;
+      copy.onclick = () => copyText(editor.value, label);
+      editor.addEventListener("input", () => {
+        copyValues[position] = editor.value;
+        copy.disabled = !editor.value;
+        if (editor.value === initial) rowEdits.delete(position);
+        else rowEdits.set(position, editor.value);
+        if (rowEdits.size) referenceEdits.set(match.row[0], rowEdits);
+        else referenceEdits.delete(match.row[0]);
+      });
+      action.append(copy);
+    });
+    const wrap = element("div", "", "table-wrap");
+    wrap.append(table);
+    detail.append(wrap);
+  } catch {
+    if (token === selection) detail.replaceChildren(element("p", "译文加载失败。", "muted"));
+  }
+}
+
+function comparisonTokens(text) {
+  return Array.from(text.matchAll(/\p{Script=Latin}[\p{Script=Latin}\p{M}]*|\p{N}+|./gsu), (match) => ({
+    key: lookupSearch.normalize(match[0]),
+    start: match.index,
+    end: match.index + match[0].length,
+  })).filter((token) => token.key);
+}
+
+function renderDifferences(label, query, candidate) {
+  const before = comparisonTokens(query);
+  const after = comparisonTokens(candidate);
+  const { prefix, suffix } = lookupSearch.sharedEdges(
+    before.map(({ key }) => key), after.map(({ key }) => key),
+  );
+  const removed = before.slice(prefix, before.length - suffix);
+  const added = after.slice(prefix, after.length - suffix);
+  const matched = new Set();
+  const retained = new Set();
+  const columns = added.length + 1;
+
+  // Bound the cost of comparing very long translations.
+  if (removed.length && added.length && (removed.length + 1) * columns <= 100000) {
+    const lengths = new Uint32Array((removed.length + 1) * columns);
+    for (let i = removed.length - 1; i >= 0; i--) {
+      for (let j = added.length - 1; j >= 0; j--) {
+        const position = i * columns + j;
+        lengths[position] = removed[i].key === added[j].key
+          ? 1 + lengths[position + columns + 1]
+          : Math.max(lengths[position + columns], lengths[position + 1]);
+      }
+    }
+    let i = 0;
+    let j = 0;
+    while (i < removed.length && j < added.length) {
+      if (removed[i].key === added[j].key) {
+        matched.add(j++);
+        retained.add(i++);
+      } else if (lengths[(i + 1) * columns + j] >= lengths[i * columns + j + 1]) {
+        i++;
+      } else {
+        j++;
+      }
+    }
+  }
+
+  let offset = 0;
+  for (let i = 0; i < added.length; i++) {
+    if (matched.has(i)) continue;
+    const start = added[i].start;
+    while (i + 1 < added.length && !matched.has(i + 1)) i++;
+    const end = added[i].end;
+    const mark = element("mark", candidate.slice(start, end), "result-difference");
+    mark.title = "与查询不同";
+    label.append(candidate.slice(offset, start), mark);
+    offset = end;
+  }
+  label.append(candidate.slice(offset));
+  if (!offset && removed.length) {
+    const missing = [];
+    for (let i = 0; i < removed.length; i++) {
+      if (retained.has(i)) continue;
+      const start = removed[i].start;
+      while (i + 1 < removed.length && !retained.has(i + 1)) i++;
+      missing.push("「" + query.slice(start, removed[i].end) + "」");
+    }
+    if (missing.length) return element("span", "缺少" + missing.join("、"), "result-omission");
+  }
+}
+
+function renderMatches({ kind, matches }, query) {
+  const results = el("results");
+  el("result-status").textContent = matches.length ? kind + " · " + number.format(matches.length) + " 条" : "未找到文言";
+  if (!matches.length) return;
+  let visible = 0;
+  const more = element("button", "显示更多");
+  function appendMatches() {
+    more.remove();
+    for (const match of matches.slice(visible, visible + 24)) {
+      const [, lid, ux, component, ...translations] = match.row;
+      const preview = match.row[lookupSearch.languageColumns[match.field]]
+        || translations.find((value) => value.trim()) || lid || ux;
+      const button = element("button", "", "result");
+      button.setAttribute("aria-pressed", "false");
+      const label = element("strong", "", "result-preview");
+      const omission = kind === "相关候选" ? renderDifferences(label, query, preview) : null;
+      if (kind !== "相关候选") label.textContent = preview;
+      button.append(label);
+      if (omission) button.append(omission);
+      button.append(element("span", [lid, ux, component].filter(Boolean).join(" · "), "result-reference"));
+      button.onclick = () => showDetail(match, button);
+      results.append(button);
+      visible++;
+    }
+    if (visible < matches.length) results.append(more);
+  }
+  more.onclick = () => {
+    const previous = results.lastElementChild.previousElementSibling;
+    appendMatches();
+    previous?.nextElementSibling?.focus();
+  };
+  appendMatches();
+  showDetail(matches[0], results.firstElementChild);
+}
+
+const lookup = el("lookup");
+const guideToggle = el("guide-toggle");
+const guideClose = el("guide-close");
+
+function setGuide(open) {
+  lookup.classList.toggle("has-guide", open);
+  el("usage-guide").hidden = !open;
+  guideToggle.setAttribute("aria-expanded", String(open));
+  guideToggle.textContent = open ? "收起说明" : "使用说明";
+}
+
+guideToggle.addEventListener("click", () => setGuide(el("usage-guide").hidden));
+guideClose.addEventListener("click", () => {
+  setGuide(false);
+  guideToggle.focus({ preventScroll: true });
+});
+
+el("search-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const query = el("query").value.trim();
+  if (!searchCatalog || !query || el("search").disabled) return;
+  el("search").disabled = true;
+  if (lookup.classList.contains("is-home")) {
+    lookup.classList.remove("is-home");
+    setGuide(false);
+    guideToggle.hidden = false;
+    guideClose.hidden = false;
+  }
+  selection++;
+  clearCopyNotice();
+  el("detail").parentElement.hidden = true;
+  el("results").replaceChildren();
+  el("results").parentElement.hidden = false;
+  el("result-status").textContent = "正在搜索…";
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    renderMatches(searchCatalog({ query, language: el("language").value }), query);
+  } catch {
+    el("result-status").textContent = "检索失败，请重试。";
+  } finally {
+    el("search").disabled = importing;
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229
+    || !event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return;
+  const key = event.key.toLowerCase();
+  if (key !== "a" && key !== "f") return;
+
+  if (!searchCatalog) return;
+  const query = el("query");
+  const active = document.activeElement;
+  if (key === "a" && active !== query
+    && (active.matches("input, textarea") || active.isContentEditable)) return;
+
+  event.preventDefault();
+  query.focus();
+  query.select();
+});
+
+el("query").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+    event.preventDefault();
+    el("search-form").requestSubmit();
+  }
+});
+
+
+const fileInput = el("catalog-file");
+const chooseCatalog = el("choose-catalog");
+chooseCatalog.onclick = () => fileInput.click();
+fileInput.onchange = async () => {
+  const file = fileInput.files[0];
+  fileInput.value = "";
+  if (!file || importing) return;
+  importing = true;
+  chooseCatalog.disabled = true;
+  el("search").disabled = true;
+  const status = el("import-status");
+  try {
+    const next = await importWorkbook(file, (message) => { status.textContent = message; });
+    status.textContent = "正在建立检索索引…";
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const nextSearch = lookupSearch.create(next.records);
+    catalog = next;
+    searchCatalog = nextSearch;
+    referenceEdits.clear();
+    selection++;
+    clearCopyNotice();
+    el("results").replaceChildren();
+    el("results").parentElement.hidden = true;
+    el("detail").parentElement.hidden = true;
+    const version = file.name.replace(/\.xlsx$/i, "").match(/(?:^|[^a-z0-9])v(\d+(?:\.\d+)+)/i);
+    el("index-status").textContent = (version ? "词库 V" + version[1] : file.name)
+      + " · " + number.format(next.records.length) + " 条";
+    el("search-form").hidden = false;
+    chooseCatalog.textContent = "更换词库";
+    status.textContent = "";
+    el("query").focus();
+    el("query").select();
+  } catch (error) {
+    status.textContent = "导入失败。 " + error.message;
+  } finally {
+    importing = false;
+    chooseCatalog.disabled = false;
+    el("search").disabled = !searchCatalog;
+  }
+};
+
+</script>
+</body>
+</html>
