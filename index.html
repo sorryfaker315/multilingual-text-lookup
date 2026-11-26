@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>多语种文言查库 · 网页版 2.5</title>
+<title>多语种文言查库 · 网页版 2.7</title>
 <style>:root {
   color-scheme: light;
   font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
@@ -370,10 +370,17 @@ main.is-home {
   overflow-wrap: anywhere;
 }
 .local-history summary { cursor: pointer; color: var(--green); font-weight: 650; }
-.local-history label { display: block; margin: 8px 0; }
-.local-history input { width: min(100%, 230px); font: inherit; padding: 4px 6px; }
-.local-history ul { padding-left: 20px; margin-bottom: 0; }
-.local-history li { margin-block: 8px; white-space: pre-wrap; }
+.history-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.history-tools button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
+#history-list { display: grid; gap: 8px; padding: 0; margin: 8px 0 0; list-style: none; }
+.history-item { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; }
+.history-entry { display: grid; gap: 4px; width: 100%; border: 0; text-align: start; padding: 9px 11px; }
+.history-entry:hover { background: var(--pale); }
+.history-entry:focus-visible { outline-offset: -2px; }
+.history-entry > span { overflow-wrap: anywhere; }
+.history-entry .history-values { white-space: pre-wrap; }
+.history-restore { margin: 0 10px 8px; }
+#lookup:not(.is-home) #search-examples { display: none; }
 </style>
 </head>
 <body>
@@ -383,7 +390,7 @@ main.is-home {
       <header class="page-header">
         <div>
           <h1>多语种文言查库</h1>
-          <p class="muted"><span>网页版 2.5</span> · <span id="index-status" role="status">尚未导入词库</span></p>
+          <p class="muted"><span>网页版 2.7</span> · <span id="index-status" role="status">尚未导入词库</span></p>
         </div>
         <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true"
           aria-controls="usage-guide" hidden>使用说明</button>
@@ -399,11 +406,13 @@ main.is-home {
         <select id="catalog-version"></select>
         <details id="local-history" class="local-history">
           <summary>本机修改记录</summary>
-          <label>记录署名 <input id="editor-name" placeholder="本机用户" maxlength="60"></label>
-          <p id="history-status" class="muted" role="status"></p>
           <ul id="history-list"></ul>
-          <button id="history-more" type="button" hidden>显示更早记录</button>
         </details>
+        <div class="history-tools">
+          <button id="history-clear" type="button" title="清除当前词库版本的修改记录" disabled>清除修改记录</button>
+          <button id="history-undo" type="button" disabled>撤销上次清除</button>
+          <span id="history-status" class="muted" role="status"></span>
+        </div>
       </div>
       <form id="search-form" class="search-panel" hidden>
         <label for="query">要查找的文言</label>
@@ -419,6 +428,13 @@ main.is-home {
             </select>
             <button id="search" type="submit" disabled>搜索</button>
           </div>
+        </div>
+        <div id="search-examples" class="search-examples" role="group" aria-label="试搜">
+          <span aria-hidden="true">试搜</span>
+          <button type="button" data-query="确认">确认</button>
+          <button type="button" data-query="설정" lang="ko">설정</button>
+          <button type="button" data-query="Bluetooth" lang="en">Bluetooth</button>
+          <button type="button" id="example-id" hidden></button>
         </div>
       </form>
     </div>
@@ -445,7 +461,7 @@ main.is-home {
       <dt>快速查找与全选</dt>
       <dd><kbd>Ctrl</kbd> + <kbd>F</kbd> 随时聚焦并全选查询。输入新文言后按 <kbd>Enter</kbd> 搜索。<kbd>Ctrl</kbd> + <kbd>A</kbd> 默认全选查询，编辑参考格式时全选当前译文。</dd>
       <dt>编辑参考格式</dt>
-      <dd>直接修改或补填。离开编辑框后保存并记录修改前后的内容；原始 Excel 保持原样。记录只在当前浏览器可见。</dd>
+      <dd>直接修改或补填。离开编辑框后保存并记录修改前后的内容；原始 Excel 保持原样。本机最多保留最近 50 条修改记录。点记录可定位到对应文言，也可恢复最近一次编辑前的值。清除当前词库的记录后可撤销上次清除。</dd>
       <dt>单条与整行复制</dt>
       <dd>「复制」取当前语种的参考格式。「复制整行」取当前记录的 54 列，包含已编辑的内容。可从飞书目标行的韩文格（values-ko）粘贴。</dd>
       <dt>筛选与候选</dt>
@@ -684,6 +700,7 @@ function restoreWorkbook({ records, blocks, strings }) {
   const blockSize = 1024;
   const rowIndices = new Map(records.map(([row], index) => [row, index]));
   return {
+    findRecord: (row) => records[rowIndices.get(row)],
     readRow(row) {
       const position = rowIndices.get(row);
       const block = blocks[Math.floor(position / blockSize)];
@@ -1097,7 +1114,7 @@ async function showDetail(match, button) {
         const previous = lastSaved;
         lastSaved = next;
         saveChange({ catalogId, row: match.row[0], lid: lid || ux, position, locale: label,
-          original: initial, previous, next, author: el("editor-name").value.trim() || "本机用户" })
+          original: initial, previous, next })
           .then(() => { if (catalogId === activeCatalogId) return refreshHistory(); })
           .catch(() => {
             lastSaved = previous;
@@ -1205,6 +1222,7 @@ function renderMatches({ kind, matches }, query) {
         || translations.find((value) => value.trim()) || lid || ux;
       const button = element("button", "", "result");
       button.setAttribute("aria-pressed", "false");
+      button.dataset.row = match.row[0];
       const label = element("strong", "", "result-preview");
       const omission = kind === "相关候选" ? renderDifferences(label, query, preview) : null;
       if (kind !== "相关候选") label.textContent = preview;
@@ -1243,11 +1261,7 @@ guideClose.addEventListener("click", () => {
   guideToggle.focus({ preventScroll: true });
 });
 
-el("search-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const query = el("query").value.trim();
-  if (!searchCatalog || !query || el("search").disabled) return;
-  el("search").disabled = true;
+function prepareResults() {
   if (lookup.classList.contains("is-home")) {
     lookup.classList.remove("is-home");
     setGuide(false);
@@ -1259,6 +1273,23 @@ el("search-form").addEventListener("submit", async (event) => {
   el("detail").parentElement.hidden = true;
   el("results").replaceChildren();
   el("results").parentElement.hidden = false;
+}
+
+el("search-examples").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-query]");
+  if (!button || !searchCatalog || el("search").disabled) return;
+  el("query").value = button.dataset.query;
+  el("language").value = "auto";
+  el("query").focus();
+  el("search-form").requestSubmit();
+});
+
+el("search-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const query = el("query").value.trim();
+  if (!searchCatalog || !query || el("search").disabled) return;
+  el("search").disabled = true;
+  prepareResults();
   el("result-status").textContent = "正在搜索…";
   await new Promise((resolve) => setTimeout(resolve, 0));
   try {
@@ -1301,7 +1332,10 @@ const versionSelect = el("catalog-version");
 const importStatus = el("import-status");
 let activeCatalogId;
 let database;
-let historyLimit = 50;
+const historyLimit = 50;
+const historyClear = el("history-clear");
+const historyUndo = el("history-undo");
+let historyBusy = false;
 
 function openStorage() {
   return new Promise((resolve, reject) => {
@@ -1344,53 +1378,176 @@ function storageWrite(stores, schedule) {
   });
 }
 
-function saveChange(change) {
-  return storageWrite(["edits", "audit"], (tx) => {
+function trimHistory(store) {
+  const count = store.count();
+  count.onsuccess = () => {
+    let excess = count.result - historyLimit;
+    if (excess <= 0) return;
+    const request = store.openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor || excess <= 0) return;
+      cursor.delete();
+      excess--;
+      if (excess) cursor.continue();
+    };
+  };
+}
+
+async function saveChange(change, expected) {
+  let applied = false;
+  await storageWrite(["edits", "audit"], (tx) => {
     const edits = tx.objectStore("edits");
     const key = [change.catalogId, change.row, change.position];
     const current = edits.get(key);
     current.onsuccess = () => {
       const previous = current.result?.next ?? change.original;
-      if (previous === change.next) return;
+      if ((expected !== undefined && previous !== expected) || previous === change.next) return;
+      applied = true;
       if (change.next === change.original) edits.delete(key);
       else edits.put(change);
-      tx.objectStore("audit").add({ ...change, previous, time: Date.now() });
+      const audit = tx.objectStore("audit");
+      audit.add({ ...change, previous, time: Date.now() });
+      trimHistory(audit);
     };
   });
+  return applied;
+}
+
+async function restoreChange(entry, button) {
+  button.disabled = true;
+  try {
+    const applied = await saveChange({
+      catalogId: entry.catalogId, row: entry.row, lid: entry.lid,
+      position: entry.position, locale: entry.locale, original: entry.original,
+      next: entry.previous, action: "restore",
+    }, entry.next);
+    if (entry.catalogId !== activeCatalogId) return;
+    if (applied) {
+      const row = referenceEdits.get(entry.row) ?? new Map();
+      if (entry.previous === entry.original) row.delete(entry.position);
+      else row.set(entry.position, entry.previous);
+      if (row.size) referenceEdits.set(entry.row, row);
+      else referenceEdits.delete(entry.row);
+      const selected = el("results").querySelector('.result[aria-pressed="true"]');
+      if (selected?.dataset.row === String(entry.row)) selected.click();
+    }
+    await refreshHistory();
+    el("history-status").textContent = applied ? "已恢复，操作已记录。" : "译文已发生其他改动，请重新打开词库后再试。";
+  } catch {
+    el("history-status").textContent = "恢复失败，请重试。";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function openHistoryEntry(entry) {
+  if (importing || entry.catalogId !== activeCatalogId) return;
+  const row = catalog.findRecord(entry.row);
+  if (!row) return;
+  const query = row[1] || row[2] || row[4] || row[5] || row[6];
+  el("query").value = query;
+  el("language").value = "auto";
+  el("local-history").open = false;
+  prepareResults();
+  renderMatches({ kind: "历史记录定位", matches: [{ row }] }, query);
+  el("results").firstElementChild?.focus();
 }
 
 async function refreshHistory() {
   if (!activeCatalogId) return;
   const id = activeCatalogId;
-  const limit = historyLimit;
-  const changes = await new Promise((resolve, reject) => {
-    const index = database.transaction("audit").objectStore("audit").index("catalogId");
-    const request = index.openCursor(IDBKeyRange.only(id), "prev");
-    const recent = [];
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (!cursor || recent.length > limit) return resolve(recent);
-      recent.push(cursor.value);
-      cursor.continue();
-    };
-    request.onerror = () => reject(request.error);
-  });
-  if (activeCatalogId !== id || historyLimit !== limit) return;
-  el("history-more").hidden = changes.length <= limit;
-  el("history-status").textContent = changes.length
-    ? "已显示 " + Math.min(changes.length, limit) + " 条修改" : "暂无修改记录";
-  el("history-list").replaceChildren(...changes.slice(0, limit).map((entry) => {
-    const info = new Date(entry.time).toLocaleString() + " · " + entry.author
-      + " · " + (entry.lid || "第 " + entry.row + " 行") + " · " + entry.locale;
-    return element("li", info + "\n原值：" + (entry.previous || "（空）")
-      + "\n新值：" + (entry.next || "（空）"));
+  const [changes, backup] = await Promise.all([
+    storageRead("audit", (store) => store.index("catalogId").getAll(id)),
+    storageRead("settings", (store) => store.get("last-history-clear")),
+  ]);
+  if (activeCatalogId !== id) return;
+  changes.reverse();
+  historyClear.disabled = historyBusy || importing || !changes.length;
+  historyUndo.disabled = historyBusy || importing || backup?.id !== id;
+  el("history-status").textContent = changes.length ? changes.length + " 条记录" : "暂无修改记录";
+  const latest = new Set();
+  el("history-list").replaceChildren(...changes.map((entry) => {
+    const row = element("li", "", "history-item");
+    const button = element("button", "", "history-entry");
+    button.type = "button";
+    button.title = "查看此条文言";
+    const action = entry.action === "restore" ? " · 恢复" : "";
+    button.append(
+      element("strong", (entry.lid || "第 " + entry.row + " 行") + " · " + entry.locale),
+      element("span", new Date(entry.time).toLocaleString() + action, "muted"),
+      element("span", "原值：" + (entry.previous || "（空）") + "\n新值：" + (entry.next || "（空）"), "history-values"),
+    );
+    button.onclick = () => openHistoryEntry(entry);
+    row.append(button);
+
+    const key = entry.row + ":" + entry.position;
+    if (!latest.has(key)) {
+      latest.add(key);
+      const restore = element("button", "恢复修改前的值", "copy history-restore");
+      restore.type = "button";
+      restore.onclick = () => restoreChange(entry, restore);
+      row.append(restore);
+    }
+    return row;
   }));
 }
 
-el("history-more").onclick = () => {
-  historyLimit += 50;
-  refreshHistory().catch(() => { el("history-status").textContent = "无法读取更多修改记录。"; });
-};
+async function changeHistory(undo) {
+  const id = activeCatalogId;
+  if (historyBusy || importing || !id) return;
+  historyBusy = true;
+  historyClear.disabled = historyUndo.disabled = true;
+  let message;
+  try {
+    await storageWrite(["audit", "settings"], (tx) => {
+      const audit = tx.objectStore("audit");
+      const settings = tx.objectStore("settings");
+      const backupKey = "last-history-clear";
+      if (undo) {
+        const request = settings.get(backupKey);
+        request.onsuccess = () => {
+          if (request.result?.id !== id) return;
+          for (const [key, entry] of request.result.entries) audit.put(entry, key);
+          settings.delete(backupKey);
+          trimHistory(audit);
+          message = "已撤销上次清除";
+        };
+        return;
+      }
+      const entries = [];
+      const request = audit.index("catalogId").openCursor(IDBKeyRange.only(id));
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          const entry = cursor.value;
+          delete entry.author;
+          entries.push([cursor.primaryKey, entry]);
+          cursor.delete();
+          cursor.continue();
+        } else if (entries.length) {
+          settings.put({ id, entries }, backupKey);
+          message = "已清除当前词库的修改记录";
+        }
+      };
+    });
+  } catch {
+    message = "无法更新修改记录，请重试。";
+  } finally {
+    historyBusy = false;
+    if (activeCatalogId === id) {
+      try {
+        await refreshHistory();
+        if (message && activeCatalogId === id) el("history-status").textContent = message;
+      } catch {
+        el("history-status").textContent = "无法读取修改记录，请刷新页面。";
+      }
+    }
+  }
+}
+
+historyClear.onclick = () => changeHistory(false);
+historyUndo.onclick = () => changeHistory(true);
 
 async function listVersions() {
   const versions = await storageRead("versions", (store) => store.getAll());
@@ -1408,6 +1565,8 @@ function setBusy(busy) {
   chooseCatalog.disabled = busy;
   el("search").disabled = busy || !searchCatalog;
   versionSelect.disabled = busy;
+  if (busy) historyClear.disabled = historyUndo.disabled = true;
+  else if (activeCatalogId) refreshHistory().catch(() => {});
 }
 
 async function activateVersion(version, workbook, remember) {
@@ -1421,7 +1580,6 @@ async function activateVersion(version, workbook, remember) {
   catalog = nextCatalog;
   searchCatalog = nextSearch;
   activeCatalogId = version.id;
-  historyLimit = 50;
   referenceEdits.clear();
   for (const edit of edits) {
     if (!referenceEdits.has(edit.row)) referenceEdits.set(edit.row, new Map());
@@ -1436,6 +1594,10 @@ async function activateVersion(version, workbook, remember) {
   el("local-tools").hidden = false;
   el("search-form").hidden = false;
   chooseCatalog.textContent = "导入新版词库";
+  const example = el("example-id");
+  const firstId = workbook.records.find((row) => row[1] || row[2]);
+  example.hidden = !firstId;
+  if (firstId) example.textContent = example.dataset.query = firstId[1] || firstId[2];
   await listVersions();
   await refreshHistory();
 }
@@ -1507,6 +1669,7 @@ versionSelect.onchange = async () => {
   setBusy(true);
   try {
     database = await openStorage();
+    await storageWrite(["audit"], (tx) => trimHistory(tx.objectStore("audit")));
     const id = await storageRead("settings", (store) => store.get("active"));
     if (!id) return;
     importStatus.textContent = "正在恢复本机词库…";
