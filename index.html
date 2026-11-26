@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>多语种文言查库 · 网页版 2.7</title>
+<title>多语种文言查库 · 网页版 2.8</title>
 <style>:root {
   color-scheme: light;
   font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
@@ -359,8 +359,6 @@ main.is-home {
 .local-tools { margin-bottom: 14px; }
 .local-tools select { max-width: 100%; }
 .local-history {
-  max-height: 300px;
-  overflow: auto;
   margin-top: 8px;
   padding: 12px;
   background: #fff;
@@ -372,14 +370,55 @@ main.is-home {
 .local-history summary { cursor: pointer; color: var(--green); font-weight: 650; }
 .history-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .history-tools button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
-#history-list { display: grid; gap: 8px; padding: 0; margin: 8px 0 0; list-style: none; }
-.history-item { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; }
-.history-entry { display: grid; gap: 4px; width: 100%; border: 0; text-align: start; padding: 9px 11px; }
+#history-list {
+  --history-card-height: 132px;
+  --history-gap: 8px;
+  display: grid;
+  grid-auto-rows: var(--history-card-height);
+  gap: var(--history-gap);
+  max-height: calc(2 * var(--history-card-height) + var(--history-gap));
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scroll-snap-type: y mandatory;
+  padding: 0 4px 0 0;
+  margin: 8px 0 0;
+  list-style: none;
+}
+#history-list:empty { display: none; }
+.history-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  scroll-snap-align: start;
+}
+.history-entry {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  text-align: start;
+  padding: 9px 11px;
+}
 .history-entry:hover { background: var(--pale); }
 .history-entry:focus-visible { outline-offset: -2px; }
 .history-entry > span { overflow-wrap: anywhere; }
-.history-entry .history-values { white-space: pre-wrap; }
-.history-restore { margin: 0 10px 8px; }
+.history-entry .history-values {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  white-space: pre-wrap;
+}
+.history-restore { align-self: flex-start; margin: 0 10px 8px; }
+@media (max-width: 480px) {
+  #history-list { --history-card-height: 144px; }
+}
 #lookup:not(.is-home) #search-examples { display: none; }
 </style>
 </head>
@@ -390,7 +429,7 @@ main.is-home {
       <header class="page-header">
         <div>
           <h1>多语种文言查库</h1>
-          <p class="muted"><span>网页版 2.7</span> · <span id="index-status" role="status">尚未导入词库</span></p>
+          <p class="muted"><span>网页版 2.8</span> · <span id="index-status" role="status">尚未导入词库</span></p>
         </div>
         <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true"
           aria-controls="usage-guide" hidden>使用说明</button>
@@ -404,9 +443,9 @@ main.is-home {
       <div id="local-tools" class="local-tools" hidden>
         <label for="catalog-version">本机词库</label>
         <select id="catalog-version"></select>
-        <details id="local-history" class="local-history">
+        <details id="local-history" class="local-history" open>
           <summary>本机修改记录</summary>
-          <ul id="history-list"></ul>
+          <ul id="history-list" tabindex="0" aria-label="修改记录列表，可滚动"></ul>
         </details>
         <div class="history-tools">
           <button id="history-clear" type="button" title="清除当前词库版本的修改记录" disabled>清除修改记录</button>
@@ -461,7 +500,7 @@ main.is-home {
       <dt>快速查找与全选</dt>
       <dd><kbd>Ctrl</kbd> + <kbd>F</kbd> 随时聚焦并全选查询。输入新文言后按 <kbd>Enter</kbd> 搜索。<kbd>Ctrl</kbd> + <kbd>A</kbd> 默认全选查询，编辑参考格式时全选当前译文。</dd>
       <dt>编辑参考格式</dt>
-      <dd>直接修改或补填。离开编辑框后保存并记录修改前后的内容；原始 Excel 保持原样。本机最多保留最近 50 条修改记录。点记录可定位到对应文言，也可恢复最近一次编辑前的值。清除当前词库的记录后可撤销上次清除。</dd>
+      <dd>直接修改或补填。离开编辑框后保存并记录修改前后的内容；原始 Excel 保持原样。本机最多保留最近 50 条修改记录。列表默认展开，最多显示两张卡片，其余可滚动查看。点记录可定位到对应文言，也可恢复最近一次编辑前的值。清除当前词库的记录后可撤销上次清除。</dd>
       <dt>单条与整行复制</dt>
       <dd>「复制」取当前语种的参考格式。「复制整行」取当前记录的 54 列，包含已编辑的内容。可从飞书目标行的韩文格（values-ko）粘贴。</dd>
       <dt>筛选与候选</dt>
@@ -1448,7 +1487,6 @@ function openHistoryEntry(entry) {
   const query = row[1] || row[2] || row[4] || row[5] || row[6];
   el("query").value = query;
   el("language").value = "auto";
-  el("local-history").open = false;
   prepareResults();
   renderMatches({ kind: "历史记录定位", matches: [{ row }] }, query);
   el("results").firstElementChild?.focus();
